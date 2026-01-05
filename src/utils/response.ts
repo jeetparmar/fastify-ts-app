@@ -9,11 +9,17 @@ export const notFound = (reply: FastifyReply, message: string) =>
 export const serverError = (reply: FastifyReply) =>
   reply.code(500).send({ status: 'failure', message: 'Internal Server Error' });
 
-export const success = (message: string, data?: any) => ({
+export const success = (
+  message: string,
+  data?: any,
+  meta?: Record<string, any>
+) => ({
   status: 'success',
   message,
-  ...(data && { data }),
+  ...(data !== undefined && { data }),
+  ...(meta !== undefined && { meta }),
 });
+
 export const failure = (message: string) => ({
   status: 'failure',
   message,

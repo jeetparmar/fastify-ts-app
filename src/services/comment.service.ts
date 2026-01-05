@@ -1,6 +1,39 @@
+import { Types } from 'mongoose';
 import Comment from '../models/Comment';
 
 export const getById = (id: string) => Comment.findById(id);
+
+export const getByCursor = async (
+  filter: Record<string, any>,
+  cursor?: string,
+  limit = 10
+) => {
+  const query: Record<string, any> = { ...filter };
+
+  // Cursor condition (fetch older records)
+  if (cursor) {
+    query._id = { $lt: new Types.ObjectId(cursor) };
+  }
+
+  // Fetch one extra record to detect "hasMore"
+  const results = await Comment.find(query)
+    .sort({ _id: -1 }) // cursor-friendly sort
+    .limit(limit + 1);
+
+  const hasMore = results.length > limit;
+
+  if (hasMore) {
+    results.pop(); // remove extra item
+  }
+
+  return {
+    data: results,
+    meta: {
+      nextCursor: results.length ? results[results.length - 1]._id : null,
+      hasMore,
+    },
+  };
+};
 
 export const getAll = (
   filter: Record<string, any>,

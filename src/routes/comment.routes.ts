@@ -1,5 +1,4 @@
 import { FastifyInstance } from 'fastify';
-import Comment from '../models/Comment';
 import mongoose from 'mongoose';
 import { isValidObjectId } from '../utils/mongo';
 import * as commentService from '../services/comment.service';
@@ -28,7 +27,7 @@ export default async function commentRoutes(fastify: FastifyInstance) {
         response: {
           200: {
             allOf: [
-              { $ref: 'SuccessResponse#' },
+              { $ref: 'SuccessResponse' },
               {
                 properties: {
                   data: { $ref: 'Comment#' },
@@ -36,7 +35,7 @@ export default async function commentRoutes(fastify: FastifyInstance) {
               },
             ],
           },
-          404: { $ref: 'ErrorResponse#' },
+          404: { $ref: 'ErrorResponse' },
         },
       },
     },
@@ -75,9 +74,9 @@ export default async function commentRoutes(fastify: FastifyInstance) {
           },
         },
         response: {
-          200: { $ref: 'PaginatedCommentResponse#' },
-          400: { $ref: 'ErrorResponse#' },
-          500: { $ref: 'ErrorResponse#' },
+          200: { $ref: 'PaginatedCommentResponse' },
+          400: { $ref: 'ErrorResponse' },
+          500: { $ref: 'ErrorResponse' },
         },
       },
     },
@@ -91,6 +90,71 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       const filter = parentId ? { parentId } : { parentId: null };
       const comments = await commentService.getAll(filter, page, limit);
       return success('Comments fetched successfully', comments);
+    }
+  );
+
+  fastify.get<{
+    Querystring: {
+      parentId?: string;
+      cursor?: string;
+      limit?: number;
+    };
+  }>(
+    '/cursor',
+    {
+      schema: {
+        description: 'Get comments using cursor-based pagination',
+        tags: ['Comments'],
+        querystring: {
+          type: 'object',
+          properties: {
+            parentId: { type: 'string' },
+            cursor: { type: 'string' },
+            limit: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
+          },
+        },
+        response: {
+          200: {
+            allOf: [
+              { $ref: 'SuccessResponse' },
+              {
+                type: 'object',
+                properties: {
+                  data: {
+                    type: 'array',
+                    items: { $ref: 'Comment' },
+                  },
+                  meta: { $ref: 'CursorMeta' },
+                },
+              },
+            ],
+          },
+          400: { $ref: 'ErrorResponse' },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { parentId, cursor, limit = 10 } = request.query;
+
+      if (parentId && !isValidObjectId(parentId)) {
+        return badRequest(reply, 'Invalid parent ID');
+      }
+
+      if (cursor && !isValidObjectId(cursor)) {
+        return badRequest(reply, 'Invalid cursor');
+      }
+
+      const filter = {
+        parentId: parentId ?? null,
+      };
+
+      const result = await commentService.getByCursor(
+        filter,
+        cursor,
+        Math.min(50, limit)
+      );
+
+      return success('Comments fetched successfully', result.data, result.meta);
     }
   );
 
@@ -124,12 +188,12 @@ export default async function commentRoutes(fastify: FastifyInstance) {
         response: {
           201: {
             allOf: [
-              { $ref: 'SuccessResponse#' },
+              { $ref: 'SuccessResponse' },
               { properties: { data: { $ref: 'Comment#' } } },
             ],
           },
-          400: { $ref: 'ErrorResponse#' },
-          404: { $ref: 'ErrorResponse#' },
+          400: { $ref: 'ErrorResponse' },
+          404: { $ref: 'ErrorResponse' },
         },
       },
     },
@@ -185,12 +249,12 @@ export default async function commentRoutes(fastify: FastifyInstance) {
         response: {
           200: {
             allOf: [
-              { $ref: 'SuccessResponse#' },
-              { properties: { data: { $ref: 'Comment#' } } },
+              { $ref: 'SuccessResponse' },
+              { properties: { data: { $ref: 'Comment' } } },
             ],
           },
-          400: { $ref: 'ErrorResponse#' },
-          404: { $ref: 'ErrorResponse#' },
+          400: { $ref: 'ErrorResponse' },
+          404: { $ref: 'ErrorResponse' },
         },
       },
     },
@@ -222,11 +286,11 @@ export default async function commentRoutes(fastify: FastifyInstance) {
         response: {
           200: {
             allOf: [
-              { $ref: 'SuccessResponse#' },
+              { $ref: 'SuccessResponse' },
               { properties: { data: { $ref: 'Comment#' } } },
             ],
           },
-          404: { $ref: 'ErrorResponse#' },
+          404: { $ref: 'ErrorResponse' },
         },
       },
     },

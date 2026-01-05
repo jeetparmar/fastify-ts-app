@@ -38,7 +38,7 @@ CommentSchema.virtual('id').get(function (this: IComment) {
   return this._id.toHexString();
 });
 
-CommentSchema.index({ parentId: 1 });
+CommentSchema.index({ parentId: 1, _id: -1 });
 
 CommentSchema.set('id', false);
 
