@@ -1,12 +1,15 @@
-import { Types } from 'mongoose';
+import { SortOrder, Types } from 'mongoose';
 import Comment from '../models/Comment';
+import { CommentSort } from '../utils/enum';
+import { sortOptionSwitch } from '../utils/methods';
 
 export const getById = (id: string) => Comment.findById(id);
 
 export const getByCursor = async (
   filter: Record<string, any>,
   cursor?: string,
-  limit = 10
+  limit = 10,
+  sort: CommentSort = CommentSort.CREATED_AT_ASC
 ) => {
   const query: Record<string, any> = { ...filter };
 
@@ -17,7 +20,7 @@ export const getByCursor = async (
 
   // Fetch one extra record to detect "hasMore"
   const results = await Comment.find(query)
-    .sort({ _id: -1 }) // cursor-friendly sort
+    .sort(sortOptionSwitch(sort))
     .limit(limit + 1);
 
   const hasMore = results.length > limit;
@@ -31,6 +34,8 @@ export const getByCursor = async (
     meta: {
       nextCursor: results.length ? results[results.length - 1]._id : null,
       hasMore,
+      limit,
+      sort,
     },
   };
 };
@@ -38,12 +43,14 @@ export const getByCursor = async (
 export const getAll = (
   filter: Record<string, any>,
   page: number,
-  limit: number
-) =>
-  Comment.find(filter)
-    .sort({ createdAt: -1 })
+  limit: number,
+  sort: CommentSort = CommentSort.CREATED_AT_ASC
+) => {
+  return Comment.find(filter)
+    .sort(sortOptionSwitch(sort))
     .skip((page - 1) * limit)
     .limit(limit);
+};
 
 export const exists = (id: string) => Comment.exists({ _id: id });
 

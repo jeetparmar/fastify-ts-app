@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import { isValidObjectId } from '../utils/mongo';
 import * as commentService from '../services/comment.service';
 import { badRequest, notFound, serverError, success } from '../utils/response';
+import { CommentSort } from '../utils/enum';
 
 export default async function commentRoutes(fastify: FastifyInstance) {
   // Get a single comment by ID
@@ -58,6 +59,7 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       parentId?: string;
       page?: number;
       limit?: number;
+      sort?: CommentSort;
     };
   }>(
     '/',
@@ -71,6 +73,18 @@ export default async function commentRoutes(fastify: FastifyInstance) {
             parentId: { type: 'string' },
             page: { type: 'integer', minimum: 1, default: 1 },
             limit: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
+            sort: {
+              type: 'string',
+              enum: [
+                CommentSort.CREATED_AT_ASC,
+                CommentSort.CREATED_AT_DESC,
+                CommentSort.UPDATED_AT_ASC,
+                CommentSort.UPDATED_AT_DESC,
+                CommentSort.TEXT_ASC,
+                CommentSort.TEXT_DESC,
+              ],
+              default: CommentSort.CREATED_AT_ASC,
+            },
           },
         },
         response: {
@@ -81,14 +95,14 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { parentId } = request.query;
+      const { parentId, sort = CommentSort.CREATED_AT_ASC } = request.query;
       if (parentId && !mongoose.isValidObjectId(parentId)) {
         return badRequest(reply, 'Invalid parent ID');
       }
       const page = Math.max(1, request.query.page ?? 1);
       const limit = Math.min(50, request.query.limit ?? 10);
       const filter = parentId ? { parentId } : { parentId: null };
-      const comments = await commentService.getAll(filter, page, limit);
+      const comments = await commentService.getAll(filter, page, limit, sort);
       return success('Comments fetched successfully', comments);
     }
   );
@@ -98,6 +112,7 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       parentId?: string;
       cursor?: string;
       limit?: number;
+      sort?: CommentSort;
     };
   }>(
     '/cursor',
@@ -111,6 +126,18 @@ export default async function commentRoutes(fastify: FastifyInstance) {
             parentId: { type: 'string' },
             cursor: { type: 'string' },
             limit: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
+            sort: {
+              type: 'string',
+              enum: [
+                CommentSort.CREATED_AT_ASC,
+                CommentSort.CREATED_AT_DESC,
+                CommentSort.UPDATED_AT_ASC,
+                CommentSort.UPDATED_AT_DESC,
+                CommentSort.TEXT_ASC,
+                CommentSort.TEXT_DESC,
+              ],
+              default: CommentSort.CREATED_AT_ASC,
+            },
           },
         },
         response: {
@@ -134,7 +161,12 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const { parentId, cursor, limit = 10 } = request.query;
+      const {
+        parentId,
+        cursor,
+        limit = 10,
+        sort = CommentSort.CREATED_AT_ASC,
+      } = request.query;
 
       if (parentId && !isValidObjectId(parentId)) {
         return badRequest(reply, 'Invalid parent ID');
@@ -151,7 +183,8 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       const result = await commentService.getByCursor(
         filter,
         cursor,
-        Math.min(50, limit)
+        Math.min(50, limit),
+        sort
       );
 
       return success('Comments fetched successfully', result.data, result.meta);
