@@ -45,8 +45,18 @@ MONGO_URI=mongodb://localhost:27017/comment-db
 🚀 Running the Server
 
 ```bash
-npx ts-node src/server.ts
+npm run dev
 ```
 
 Server will start at: http://localhost:3000
 Swagger documentation: http://localhost:3000/docs
+
+## 📸 Preview
+
+<div align="center">
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 20px 0;">
+        <div>
+            <img src="docs/swagger.png" alt="Swagger UI Preview" style="width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1);">
+        </div>
+    </div>
+</div>
