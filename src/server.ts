@@ -5,7 +5,7 @@ import commentRoutes from './routes/comment.routes';
 import { PORT } from './config';
 import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
-import { registerCommentSchema } from './schemas/comment.schema';
+import { registerSchemas } from './schemas';
 
 const fastify = Fastify({ logger: true });
 
@@ -53,7 +53,7 @@ fastify.register(commentRoutes, { prefix: '/api/v1/comments' });
 // Start server
 const start = async () => {
   try {
-    await registerCommentSchema(fastify);
+    await registerSchemas(fastify);
     await fastify.listen({ port: Number(PORT) });
     console.log(`Server running at http://localhost:${PORT}`);
     console.log(`Swagger docs available at http://localhost:${PORT}/docs`);

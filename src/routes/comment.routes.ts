@@ -27,20 +27,16 @@ export default async function commentRoutes(fastify: FastifyInstance) {
 
         response: {
           200: {
-            type: 'object',
-            properties: {
-              status: { type: 'string' },
-              message: { type: 'string' },
-              data: { $ref: 'Comment#' },
-            },
+            allOf: [
+              { $ref: 'SuccessResponse#' },
+              {
+                properties: {
+                  data: { $ref: 'Comment#' },
+                },
+              },
+            ],
           },
-          404: {
-            type: 'object',
-            properties: {
-              status: { type: 'string' },
-              message: { type: 'string' },
-            },
-          },
+          404: { $ref: 'ErrorResponse#' },
         },
       },
     },
@@ -79,31 +75,9 @@ export default async function commentRoutes(fastify: FastifyInstance) {
           },
         },
         response: {
-          200: {
-            type: 'object',
-            properties: {
-              status: { type: 'string' },
-              message: { type: 'string' },
-              data: {
-                type: 'array',
-                items: { $ref: 'Comment#' },
-              },
-            },
-          },
-          400: {
-            type: 'object',
-            properties: {
-              status: { type: 'string' },
-              message: { type: 'string' },
-            },
-          },
-          500: {
-            type: 'object',
-            properties: {
-              status: { type: 'string' },
-              message: { type: 'string' },
-            },
-          },
+          200: { $ref: 'PaginatedCommentResponse#' },
+          400: { $ref: 'ErrorResponse#' },
+          500: { $ref: 'ErrorResponse#' },
         },
       },
     },
@@ -149,27 +123,13 @@ export default async function commentRoutes(fastify: FastifyInstance) {
         },
         response: {
           201: {
-            type: 'object',
-            properties: {
-              status: { type: 'string' },
-              message: { type: 'string' },
-              data: { $ref: 'Comment#' },
-            },
+            allOf: [
+              { $ref: 'SuccessResponse#' },
+              { properties: { data: { $ref: 'Comment#' } } },
+            ],
           },
-          400: {
-            type: 'object',
-            properties: {
-              status: { type: 'string' },
-              message: { type: 'string' },
-            },
-          },
-          404: {
-            type: 'object',
-            properties: {
-              status: { type: 'string' },
-              message: { type: 'string' },
-            },
-          },
+          400: { $ref: 'ErrorResponse#' },
+          404: { $ref: 'ErrorResponse#' },
         },
       },
     },
@@ -224,27 +184,13 @@ export default async function commentRoutes(fastify: FastifyInstance) {
         },
         response: {
           200: {
-            type: 'object',
-            properties: {
-              status: { type: 'string' },
-              message: { type: 'string' },
-              data: { $ref: 'Comment#' },
-            },
+            allOf: [
+              { $ref: 'SuccessResponse#' },
+              { properties: { data: { $ref: 'Comment#' } } },
+            ],
           },
-          400: {
-            type: 'object',
-            properties: {
-              status: { type: 'string' },
-              message: { type: 'string' },
-            },
-          },
-          404: {
-            type: 'object',
-            properties: {
-              status: { type: 'string' },
-              message: { type: 'string' },
-            },
-          },
+          400: { $ref: 'ErrorResponse#' },
+          404: { $ref: 'ErrorResponse#' },
         },
       },
     },
@@ -275,19 +221,12 @@ export default async function commentRoutes(fastify: FastifyInstance) {
         tags: ['Comments'],
         response: {
           200: {
-            type: 'object',
-            properties: {
-              status: { type: 'string' },
-              message: { type: 'string' },
-              data: { $ref: 'Comment#' },
-            },
+            allOf: [
+              { $ref: 'SuccessResponse#' },
+              { properties: { data: { $ref: 'Comment#' } } },
+            ],
           },
-          404: {
-            type: 'object',
-            properties: {
-              message: { type: 'string' },
-            },
-          },
+          404: { $ref: 'ErrorResponse#' },
         },
       },
     },
