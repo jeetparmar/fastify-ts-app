@@ -21,7 +21,8 @@ const CommentSchema: Schema = new Schema(
       default: 0,
     },
     parentId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Comment',
       default: null,
     },
   },
@@ -36,6 +37,8 @@ const CommentSchema: Schema = new Schema(
 CommentSchema.virtual('id').get(function (this: IComment) {
   return this._id.toHexString();
 });
+
+CommentSchema.index({ parentId: 1 });
 
 CommentSchema.set('id', false);
 

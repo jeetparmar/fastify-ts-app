@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import Comment from '../models/Comment';
+import mongoose from 'mongoose';
 
 export default async function commentRoutes(fastify: FastifyInstance) {
   // Get a single comment by ID
@@ -41,17 +42,33 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const comment = await Comment.findById(request.params.id);
-      if (!comment) {
+      const { id } = request.params;
+
+      // Validate the Id
+      if (!mongoose.isValidObjectId(id)) {
         return reply
-          .code(404)
-          .send({ status: 'failure', message: 'Comment not found' });
+          .code(400)
+          .send({ status: 'failure', message: 'Invalid comment ID' });
       }
-      return {
-        status: 'success',
-        message: 'Comment fetched successfully',
-        data: comment,
-      };
+
+      try {
+        const comment = await Comment.findById(id);
+        if (!comment) {
+          return reply
+            .code(404)
+            .send({ status: 'failure', message: 'Comment not found' });
+        }
+        return {
+          status: 'success',
+          message: 'Comment fetched successfully',
+          data: comment,
+        };
+      } catch (error) {
+        console.error('Error fetching comment:', error);
+        return reply
+          .code(500)
+          .send({ status: 'failure', message: 'Internal Server Error' });
+      }
     }
   );
 
@@ -84,18 +101,49 @@ export default async function commentRoutes(fastify: FastifyInstance) {
               },
             },
           },
+          400: {
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              message: { type: 'string' },
+            },
+          },
+          500: {
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              message: { type: 'string' },
+            },
+          },
         },
       },
     },
-    async (request) => {
-      const { parentId } = request.query;
-      const filter = parentId ? { parentId } : { parentId: null };
-      const comments = await Comment.find(filter).sort({ createdAt: -1 });
-      return {
-        status: 'success',
-        message: 'Comments fetched successfully',
-        data: comments,
-      };
+    async (request, reply) => {
+      try {
+        const { parentId } = request.query;
+
+        // Validate the parentId if provided
+        if (parentId && !mongoose.isValidObjectId(parentId)) {
+          return reply
+            .code(400)
+            .send({ status: 'failure', message: 'Invalid parentId' });
+        }
+        // Build the filter based on parentId
+        const filter = parentId ? { parentId } : { parentId: null };
+
+        // Fetch comments from the database
+        const comments = await Comment.find(filter).sort({ createdAt: -1 });
+        return {
+          status: 'success',
+          message: 'Comments fetched successfully',
+          data: comments,
+        };
+      } catch (error) {
+        console.error('Error fetching comments:', error);
+        return reply
+          .code(500)
+          .send({ status: 'failure', message: 'Internal Server Error' });
+      }
     }
   );
 
@@ -135,36 +183,65 @@ export default async function commentRoutes(fastify: FastifyInstance) {
               data: { $ref: 'Comment#' },
             },
           },
+          400: {
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              message: { type: 'string' },
+            },
+          },
+          404: {
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              message: { type: 'string' },
+            },
+          },
         },
       },
     },
     async (request, reply) => {
-      const { parentId } = request.query;
-      if (parentId) {
-        const parent = await Comment.findById(parentId);
-        if (!parent) {
+      try {
+        const { parentId } = request.query;
+        // Validate the parentId if provided
+        if (parentId && !mongoose.isValidObjectId(parentId)) {
           return reply
-            .code(404)
-            .send({ status: 'failure', message: 'Parent comment not found' });
+            .code(400)
+            .send({ status: 'failure', message: 'Invalid parentId' });
         }
-      }
-      const comment = new Comment({
-        text: request.body.text,
-        parentId: parentId ?? null,
-      });
-      await comment.save();
-      // Increment counter for parent
-      if (parentId) {
-        await Comment.findByIdAndUpdate(parentId, {
-          $inc: { totalSubComments: 1 },
+        // If parentId is provided, check if the parent comment exists
+        if (parentId) {
+          const parent = await Comment.findById(parentId);
+          if (!parent) {
+            return reply
+              .code(404)
+              .send({ status: 'failure', message: 'Parent comment not found' });
+          }
+        }
+        const comment = new Comment({
+          text: request.body.text,
+          parentId: parentId ?? null,
         });
+        await comment.save();
+
+        // Increment counter for parent
+        if (parentId) {
+          await Comment.findByIdAndUpdate(parentId, {
+            $inc: { totalSubComments: 1 },
+          });
+        }
+        reply.code(201);
+        return {
+          status: 'success',
+          message: 'Comment created successfully',
+          data: comment,
+        };
+      } catch (error) {
+        console.error('Error creating comment:', error);
+        return reply
+          .code(500)
+          .send({ status: 'failure', message: 'Internal Server Error' });
       }
-      reply.code(201);
-      return {
-        status: 'success',
-        message: 'Comment created successfully',
-        data: comment,
-      };
     }
   );
 
@@ -205,9 +282,17 @@ export default async function commentRoutes(fastify: FastifyInstance) {
               data: { $ref: 'Comment#' },
             },
           },
+          400: {
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              message: { type: 'string' },
+            },
+          },
           404: {
             type: 'object',
             properties: {
+              status: { type: 'string' },
               message: { type: 'string' },
             },
           },
@@ -215,21 +300,41 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      const updated = await Comment.findByIdAndUpdate(
-        request.params.id,
-        { text: request.body.text },
-        { new: true }
-      );
-      if (!updated) {
+      try {
+        const { id } = request.params;
+        const { text } = request.body;
+
+        //Validate the Id
+        if (!mongoose.isValidObjectId(id)) {
+          return reply
+            .code(400)
+            .send({ status: 'failure', message: 'Invalid comment ID' });
+        }
+
+        // Update the comment
+        const updated = await Comment.findByIdAndUpdate(
+          id,
+          { text },
+          { new: true }
+        );
+
+        // Check if comment exists
+        if (!updated) {
+          return reply
+            .code(404)
+            .send({ status: 'failure', message: 'Comment not found' });
+        }
+        return {
+          status: 'success',
+          message: 'Comment updated successfully',
+          data: updated,
+        };
+      } catch (error) {
+        console.error('Error updating comment:', error);
         return reply
-          .code(404)
-          .send({ status: 'failure', message: 'Comment not found' });
+          .code(500)
+          .send({ status: 'failure', message: 'Internal Server Error' });
       }
-      return {
-        status: 'success',
-        message: 'Comment updated successfully',
-        data: updated,
-      };
     }
   );
 
@@ -244,25 +349,54 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       schema: {
         description: 'Delete a comment by ID',
         tags: ['Comments'],
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              status: { type: 'string' },
+              message: { type: 'string' },
+              data: { $ref: 'Comment#' },
+            },
+          },
+          404: {
+            type: 'object',
+            properties: {
+              message: { type: 'string' },
+            },
+          },
+        },
       },
     },
     async (request, reply) => {
-      const deleted = await Comment.findByIdAndDelete(request.params.id);
-      if (!deleted) {
+      try {
+        if (!mongoose.isValidObjectId(request.params.id)) {
+          return reply
+            .code(400)
+            .send({ status: 'failure', message: 'Invalid comment ID' });
+        }
+        const deleted = await Comment.findByIdAndDelete(request.params.id);
+        if (!deleted) {
+          return reply
+            .code(404)
+            .send({ status: 'failure', message: 'Comment not found' });
+        }
+        // Decrement counter for parent if parentId exists
+        if (deleted.parentId && mongoose.isValidObjectId(deleted.parentId)) {
+          await Comment.findByIdAndUpdate(deleted.parentId, {
+            $inc: { totalSubComments: -1 },
+          });
+        }
+        return {
+          status: 'success',
+          message: 'Comment deleted successfully',
+          data: deleted,
+        };
+      } catch (error) {
+        console.error('Error deleting comment:', error);
         return reply
-          .code(404)
-          .send({ status: 'failure', message: 'Comment not found' });
+          .code(500)
+          .send({ status: 'failure', message: 'Internal Server Error' });
       }
-      // Decrement counter for parent
-      if (deleted.parentId) {
-        await Comment.findByIdAndUpdate(deleted.parentId, {
-          $inc: { totalSubComments: -1 },
-        });
-      }
-      return {
-        status: 'success',
-        message: 'Comment deleted successfully',
-      };
     }
   );
 }
