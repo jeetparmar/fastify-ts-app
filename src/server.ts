@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import dbConnector from './plugins/db';
-import commentRoutes from './routes/comment';
+import commentRoutes from './routes/comment.routes';
 import { PORT } from './config';
 import swagger from '@fastify/swagger';
 import swaggerUI from '@fastify/swagger-ui';
@@ -37,6 +37,14 @@ fastify.register(swaggerUI, {
     docExpansion: 'full',
     deepLinking: false,
   },
+});
+
+fastify.setErrorHandler((error, request, reply) => {
+  request.log.error(error);
+  reply.code(500).send({
+    status: 'failure',
+    message: 'Internal Server Error',
+  });
 });
 
 // Register routes

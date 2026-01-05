@@ -1,9 +1,9 @@
 import { FastifyInstance } from 'fastify';
 import Comment from '../models/Comment';
 import mongoose from 'mongoose';
-import { badRequest, notFound, serverError } from '../utils/reply';
 import { isValidObjectId } from '../utils/mongo';
-import { success } from '../utils/response';
+import * as commentService from '../services/comment.service';
+import { badRequest, notFound, serverError, success } from '../utils/response';
 
 export default async function commentRoutes(fastify: FastifyInstance) {
   // Get a single comment by ID
@@ -46,20 +46,14 @@ export default async function commentRoutes(fastify: FastifyInstance) {
     },
     async (request, reply) => {
       const { id } = request.params;
-      // Validate the Id
       if (!isValidObjectId(id)) {
         return badRequest(reply, 'Invalid comment ID');
       }
-      try {
-        const comment = await Comment.findById(id);
-        if (!comment) {
-          return notFound(reply, 'Comment not found');
-        }
-        return success('Comment fetched successfully', comment);
-      } catch (error) {
-        console.error('Error fetching comment:', error);
-        return serverError(reply);
+      const comment = await commentService.getById(id);
+      if (!comment) {
+        return notFound(reply, 'Comment not found');
       }
+      return success('Comment fetched successfully', comment);
     }
   );
 
@@ -67,6 +61,8 @@ export default async function commentRoutes(fastify: FastifyInstance) {
   fastify.get<{
     Querystring: {
       parentId?: string;
+      page?: number;
+      limit?: number;
     };
   }>(
     '/',
@@ -78,6 +74,8 @@ export default async function commentRoutes(fastify: FastifyInstance) {
           type: 'object',
           properties: {
             parentId: { type: 'string' },
+            page: { type: 'integer', minimum: 1, default: 1 },
+            limit: { type: 'integer', minimum: 1, maximum: 50, default: 10 },
           },
         },
         response: {
@@ -110,21 +108,15 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      try {
-        const { parentId } = request.query;
-        // Validate the parentId if provided
-        if (parentId && !mongoose.isValidObjectId(parentId)) {
-          return badRequest(reply, 'Invalid parent ID');
-        }
-        // Build the filter based on parentId
-        const filter = parentId ? { parentId } : { parentId: null };
-        // Fetch comments from the database
-        const comments = await Comment.find(filter).sort({ createdAt: -1 });
-        return success('Comments fetched successfully', comments);
-      } catch (error) {
-        console.error('Error fetching comments:', error);
-        return serverError(reply);
+      const { parentId } = request.query;
+      if (parentId && !mongoose.isValidObjectId(parentId)) {
+        return badRequest(reply, 'Invalid parent ID');
       }
+      const page = Math.max(1, request.query.page ?? 1);
+      const limit = Math.min(50, request.query.limit ?? 10);
+      const filter = parentId ? { parentId } : { parentId: null };
+      const comments = await commentService.getAll(filter, page, limit);
+      return success('Comments fetched successfully', comments);
     }
   );
 
@@ -182,38 +174,23 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      try {
-        const { parentId } = request.query;
-        // Validate the parentId if provided
-        if (parentId) {
-          if (!isValidObjectId(parentId)) {
-            return badRequest(reply, 'Invalid parent ID');
-          }
-          // If parentId is provided, check if the parent comment exists
-          const exists = await Comment.exists({ _id: parentId });
-          if (!exists) {
-            return notFound(reply, 'Parent comment not found');
-          }
+      const { parentId } = request.query;
+      if (parentId) {
+        if (!isValidObjectId(parentId)) {
+          return badRequest(reply, 'Invalid parent ID');
         }
-
-        const comment = new Comment({
-          text: request.body.text,
-          parentId: parentId ?? null,
-        });
-        await comment.save();
-
-        // Increment counter for parent
-        if (parentId) {
-          await Comment.findByIdAndUpdate(parentId, {
-            $inc: { totalSubComments: 1 },
-          });
+        const exists = await commentService.exists(parentId);
+        if (!exists) {
+          return notFound(reply, 'Parent comment not found');
         }
-        reply.code(201);
-        return success('Comments created successfully', comment);
-      } catch (error) {
-        console.error('Error creating comment:', error);
-        return serverError(reply);
       }
+
+      const comment = await commentService.create(request.body.text, parentId);
+      if (parentId) {
+        await commentService.incSubCount(parentId, 1);
+      }
+      reply.code(201);
+      return success('Comments created successfully', comment);
     }
   );
 
@@ -272,31 +249,16 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      try {
-        const { id } = request.params;
-        const { text } = request.body;
-
-        //Validate the Id
-        if (!isValidObjectId(id)) {
-          return badRequest(reply, 'Invalid comment ID');
-        }
-
-        // Update the comment
-        const updated = await Comment.findByIdAndUpdate(
-          id,
-          { text },
-          { new: true }
-        );
-
-        // Check if comment exists
-        if (!updated) {
-          return notFound(reply, 'Comment not found');
-        }
-        return success('Comments updated successfully', updated);
-      } catch (error) {
-        console.error('Error updating comment:', error);
-        return serverError(reply);
+      const { id } = request.params;
+      const { text } = request.body;
+      if (!isValidObjectId(id)) {
+        return badRequest(reply, 'Invalid comment ID');
       }
+      const updated = await commentService.updateById(id, text);
+      if (!updated) {
+        return notFound(reply, 'Comment not found');
+      }
+      return success('Comments updated successfully', updated);
     }
   );
 
@@ -330,26 +292,18 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       },
     },
     async (request, reply) => {
-      try {
-        const { id } = request.params;
-        if (!isValidObjectId(id)) {
-          return badRequest(reply, 'Invalid comment ID');
-        }
-        const deleted = await Comment.findByIdAndDelete(id);
-        if (!deleted) {
-          return notFound(reply, 'Comment not found');
-        }
-        // Decrement counter for parent if parentId exists
-        if (deleted.parentId && mongoose.isValidObjectId(deleted.parentId)) {
-          await Comment.findByIdAndUpdate(deleted.parentId, {
-            $inc: { totalSubComments: -1 },
-          });
-        }
-        return success('Comments deleted successfully', deleted);
-      } catch (error) {
-        console.error('Error deleting comment:', error);
-        return serverError(reply);
+      const { id } = request.params;
+      if (!isValidObjectId(id)) {
+        return badRequest(reply, 'Invalid comment ID');
       }
+      const deleted = await commentService.deleteById(id);
+      if (!deleted) {
+        return notFound(reply, 'Comment not found');
+      }
+      if (deleted.parentId && mongoose.isValidObjectId(deleted.parentId)) {
+        await commentService.incSubCount(deleted.parentId, -1);
+      }
+      return success('Comments deleted successfully', deleted);
     }
   );
 }
