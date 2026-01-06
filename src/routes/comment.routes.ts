@@ -47,7 +47,7 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       }
       const comment = await commentService.getById(id);
       if (!comment) {
-        return notFound(reply, 'Comment not found');
+        return notFound(reply, 'Comment not found or deleted');
       }
       return success('Comment fetched successfully', comment);
     }
@@ -112,7 +112,7 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       parentId?: string;
       cursor?: string;
       limit?: number;
-      sort?: CommentSort;
+      sort: CommentSort;
     };
   }>(
     '/cursor',
@@ -238,7 +238,7 @@ export default async function commentRoutes(fastify: FastifyInstance) {
         }
         const exists = await commentService.exists(parentId);
         if (!exists) {
-          return notFound(reply, 'Parent comment not found');
+          return notFound(reply, 'Parent comment not found or deleted');
         }
       }
 
@@ -299,7 +299,7 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       }
       const updated = await commentService.updateById(id, text);
       if (!updated) {
-        return notFound(reply, 'Comment not found');
+        return notFound(reply, 'Comment not found or deleted');
       }
       return success('Comments updated successfully', updated);
     }
@@ -320,7 +320,7 @@ export default async function commentRoutes(fastify: FastifyInstance) {
           200: {
             allOf: [
               { $ref: 'SuccessResponse' },
-              { properties: { data: { $ref: 'Comment#' } } },
+              { properties: { data: { $ref: 'Comment' } } },
             ],
           },
           404: { $ref: 'ErrorResponse' },
@@ -332,12 +332,10 @@ export default async function commentRoutes(fastify: FastifyInstance) {
       if (!isValidObjectId(id)) {
         return badRequest(reply, 'Invalid comment ID');
       }
-      const deleted = await commentService.deleteById(id);
+      const result = await commentService.deleteById(id);
+      const deleted = result?.root;
       if (!deleted) {
-        return notFound(reply, 'Comment not found');
-      }
-      if (deleted.parentId && mongoose.isValidObjectId(deleted.parentId)) {
-        await commentService.incSubCount(deleted.parentId, -1);
+        return notFound(reply, 'Comment not found or already deleted');
       }
       return success('Comments deleted successfully', deleted);
     }

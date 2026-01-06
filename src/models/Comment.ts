@@ -25,6 +25,9 @@ const CommentSchema: Schema = new Schema(
       ref: 'Comment',
       default: null,
     },
+    // 🔥 Soft delete fields
+    isDeleted: { type: Boolean, default: false },
+    deletedAt: { type: Date, default: null },
   },
   {
     timestamps: true,
@@ -38,7 +41,9 @@ CommentSchema.virtual('id').get(function (this: IComment) {
   return this._id.toHexString();
 });
 
+// ✅ Index for fast queries
 CommentSchema.index({ parentId: 1, _id: -1 });
+CommentSchema.index({ isDeleted: 1 });
 
 CommentSchema.set('id', false);
 
